@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT-Finpro Console</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        /* --- 1. GLOBAL STYLES --- */
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- 2. HEADER & STATUS --- */
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(to right, #22c55e, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .status-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(239, 68, 68, 0.2); /* Default Red tint */
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+        .status-badge.connected {
+            background-color: rgba(34, 197, 94, 0.2); /* Green tint */
+            color: var(--accent-green);
+        }
+
+        /* --- 3. DASHBOARD GRID --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 15px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            text-align: center;
+        }
+        .card-full {
+            grid-column: span 2;
+        }
+        .card-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .unit {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* --- 4. BATTERY BAR --- */
+        .battery-container {
+            width: 100%;
+            height: 8px;
+            background-color: #334155;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .battery-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-red);
+            transition: width 0.5s ease, background 0.5s ease;
+            border-radius: 4px;
+        }
+
+        /* --- 5. SLIDER CONTROLS (Custom UI) --- */
+        .control-group {
+            margin-top: 20px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        /* Styling Slider agar enak di HP */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 40px; /* Area sentuh lebih besar */
+            margin: 0;
+            cursor: pointer;
+        }
+        /* Track (Garis) */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+        }
+        /* Thumb (Tombol Geser) */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: var(--text-main);
+            margin-top: -10px; /* Tengah track */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 2px solid var(--accent-blue);
+        }
+        /* Active State */
+        input[type=range]:active::-webkit-slider-thumb {
+            transform: scale(1.2);
+            background: var(--accent-blue);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>IoT-FINPRO</h1>
+        <div id="statusBadge" class="status-badge">Connecting...</div>
+    </header>
+
+    <div class="grid-container">
+        <div class="card card-full">
+            <div class="card-label">Battery Voltage</div>
+            <div class="card-value"><span id="valVolt">0.00</span> <span class="unit">V</span></div>
+            <div class="battery-container">
+                <div id="barVolt" class="battery-fill"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Speed</div>
+            <div class="card-value" id="valSpeed">0</div>
+            <div class="unit">PWM</div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Steering</div>
+            <div class="card-value" id="valAngle">90</div>
+            <div class="unit">DEGREE</div>
+        </div>
+    </div>
+
+    <div class="card card-full" style="width: 100%; max-width: 600px; box-sizing: border-box;">
+        <div class="card-label" style="margin-bottom: 20px; color: var(--accent-blue);">WEB CONTROLLER</div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <span>Mundur</span>
+                <span id="dispSpeed" style="color: var(--accent-blue);">0</span>
+                <span>Maju</span>
+            </div>
+            <input type="range" id="sliderSpeed" min="-255" max="255" value="0" oninput="sendSpeed(this.value)">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <span>Kiri</span>
+                <span id="dispSteer" style="color: var(--accent-blue);">90</span>
+                <span>Kanan</span>
+            </div>
+            <input type="range" id="sliderSteer" min="50" max="130" value="90" oninput="sendSteer(this.value)">
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI MQTT (VERCEL READY) ---
+        const broker = "broker.hivemq.com";
+        const port = 8884; // Secure Port
+        const clientID = "WebUser_" + parseInt(Math.random() * 10000);
+        
+        // Topik
+        const topic_rx_volt  = "ui/iotfinpro/telemetry/voltage";
+        const topic_rx_speed = "ui/iotfinpro/telemetry/speed";
+        const topic_rx_angle = "ui/iotfinpro/telemetry/steering";
+        
+        const topic_tx_speed = "ui/iotfinpro/control/speed";
+        const topic_tx_steer = "ui/iotfinpro/control/steer";
+
+        const client = new Paho.MQTT.Client(broker, port, clientID);
+        
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+
+        // Connect
+        console.log("Connecting...");
+        client.connect({onSuccess:onConnect, useSSL:true});
+
+        function onConnect() {
+            console.log("Connected!");
+            const badge = document.getElementById("statusBadge");
+            badge.innerText = "● SYSTEM ONLINE";
+            badge.classList.add("connected");
+            
+            // Subscribe
+            client.subscribe("ui/iotfinpro/telemetry/#");
+        }
+
+        function onConnectionLost(responseObject) {
+            console.log("Lost: " + responseObject.errorMessage);
+            const badge = document.getElementById("statusBadge");
+            badge.innerText = "● DISCONNECTED";
+            badge.classList.remove("connected");
+        }
+
+        function onMessageArrived(message) {
+            const topic = message.destinationName;
+            const payload = message.payloadString;
+
+            if (topic === topic_rx_volt) {
+                let v = parseFloat(payload);
+                document.getElementById("valVolt").innerText = v.toFixed(2);
+                
+                // Logic Warna Baterai
+                let percent = ((v - 6.0) / (8.4 - 6.0)) * 100;
+                if(percent < 0) percent = 0; if(percent > 100) percent = 100;
+                
+                const bar = document.getElementById("barVolt");
+                bar.style.width = percent + "%";
+                
+                if(v < 6.8) bar.style.background = "#ef4444"; // Merah
+                else if(v < 7.4) bar.style.background = "#facc15"; // Kuning
+                else bar.style.background = "#22c55e"; // Hijau
+            }
+            else if (topic === topic_rx_speed) {
+                document.getElementById("valSpeed").innerText = payload;
+            }
+            else if (topic === topic_rx_angle) {
+                document.getElementById("valAngle").innerText = payload;
+            }
+        }
+
+        // Logic Pengirim (Publisher)
+        function sendSpeed(val) {
+            document.getElementById("dispSpeed").innerText = val;
+            let message = new Paho.MQTT.Message(val);
+            message.destinationName = topic_tx_speed;
+            client.send(message);
+        }
+
+        function sendSteer(val) {
+            document.getElementById("dispSteer").innerText = val;
+            let message = new Paho.MQTT.Message(val);
+            message.destinationName = topic_tx_steer;
+            client.send(message);
+        }
+    </script>
+</body>
+</html>
