@@ -116,11 +116,12 @@
     </div>
 
     <script>
-        // --- KONFIGURASI MQTT ---
-        // PENTING: Jika di HOSTING (Vercel), ubah port jadi 8884 dan useSSL: true
-        // PENTING: Jika LOCAL (Laptop), pakai port 8000 dan useSSL: false
+        // --- KONFIGURASI MQTT KHUSUS VERCEL (SECURE) ---
+        // 1. Broker: Tetap HiveMQ
+        // 2. Port: 8884 (Secure WebSocket / WSS) -> WAJIB untuk Vercel
+        // 3. SSL: true -> WAJIB untuk Vercel
         const broker = "broker.hivemq.com";
-        const port = 8000; // WebSocket Port (Local)
+        const port = 8884; 
         const clientID = "WebDash_IoTFinpro_" + parseInt(Math.random() * 100000);
         
         // Topik (Sinkron dengan ESP32)
@@ -138,9 +139,9 @@
         client.onConnectionLost = onConnectionLost;
         client.onMessageArrived = onMessageArrived;
 
-        // Mulai Koneksi
+        // Mulai Koneksi dengan SSL/TLS
         console.log("Connecting to " + broker + ":" + port);
-        client.connect({onSuccess:onConnect, useSSL:false});
+        client.connect({onSuccess:onConnect, useSSL:true});
 
         function onConnect() {
             console.log("Connected!");
