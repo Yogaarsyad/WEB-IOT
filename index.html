@@ -3,128 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT-Finpro Control Center</title>
+    <title>IoT-Finpro Console</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* TEMA GELAP (DARK MODE) */
-        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; text-align: center; margin: 0; padding: 20px; }
-        h1 { color: #00e676; letter-spacing: 1.5px; margin-bottom: 5px; }
-        .status { font-size: 0.9rem; margin-bottom: 20px; font-weight: bold; }
-        .connected { color: #00e676; }
-        .disconnected { color: #ff3d00; }
-
-        /* GRID LAYOUT */
-        .container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-            max-width: 800px;
-            margin: 0 auto;
+        /* --- 1. GLOBAL STYLES --- */
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
         }
-
-        /* CARD STYLE */
-        .card {
-            background: #1e1e1e;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            border: 1px solid #333;
-        }
-        .card h2 { margin-top: 0; color: #bdbdbd; font-size: 1.1rem; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        
-        /* VALUE DISPLAY */
-        .big-value { font-size: 2.5rem; font-weight: 700; color: #fff; }
-        .unit { font-size: 0.8rem; color: #888; text-transform: uppercase; }
-        
-        /* BATTERY BAR */
-        .battery-shell {
-            width: 100%; height: 20px; background: #333; margin: 10px 0;
-            border-radius: 10px; overflow: hidden; position: relative;
-        }
-        .battery-level {
-            height: 100%; width: 0%; 
-            background: linear-gradient(90deg, #d32f2f, #fbc02d, #388e3c);
-            transition: width 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
 
-        /* SLIDER CONTROL */
-        input[type=range] {
-            width: 100%; -webkit-appearance: none; background: transparent; margin: 15px 0;
+        /* --- 2. HEADER & STATUS --- */
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 600px;
         }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
-            background: #00e676; cursor: pointer; margin-top: -10px; box-shadow: 0 0 5px rgba(0,230,118,0.5);
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(to right, #22c55e, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer; background: #555; border-radius: 2px;
+        .status-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(239, 68, 68, 0.2); /* Default Red tint */
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+        .status-badge.connected {
+            background-color: rgba(34, 197, 94, 0.2); /* Green tint */
+            color: var(--accent-green);
+        }
+
+        /* --- 3. DASHBOARD GRID --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 15px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            text-align: center;
+        }
+        .card-full {
+            grid-column: span 2;
+        }
+        .card-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .unit {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* --- 4. BATTERY BAR --- */
+        .battery-container {
+            width: 100%;
+            height: 8px;
+            background-color: #334155;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .battery-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-red);
+            transition: width 0.5s ease, background 0.5s ease;
+            border-radius: 4px;
+        }
+
+        /* --- 5. SLIDER CONTROLS (Custom UI) --- */
+        .control-group {
+            margin-top: 20px;
+        }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
         }
         
-        /* BUTTONS */
-        .btn-stop {
-            background-color: #d32f2f; color: white; border: none; padding: 12px;
-            border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; 
-            font-size: 1rem; transition: background 0.2s;
+        /* Styling Slider agar enak di HP */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 40px; /* Area sentuh lebih besar */
+            margin: 0;
+            cursor: pointer;
         }
-        .btn-stop:hover { background-color: #b71c1c; }
-        .btn-stop:active { transform: scale(0.98); }
+        /* Track (Garis) */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+        }
+        /* Thumb (Tombol Geser) */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: var(--text-main);
+            margin-top: -10px; /* Tengah track */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 2px solid var(--accent-blue);
+        }
+        /* Active State */
+        input[type=range]:active::-webkit-slider-thumb {
+            transform: scale(1.2);
+            background: var(--accent-blue);
+        }
 
     </style>
 </head>
 <body>
 
-    <h1>🏎️ IoT-Finpro RC Console</h1>
-    <div id="connectionStatus" class="status disconnected">Status: Disconnected ❌</div>
+    <header>
+        <h1>IoT-FINPRO</h1>
+        <div id="statusBadge" class="status-badge">Connecting...</div>
+    </header>
 
-    <div class="container">
-        <div class="card">
-            <h2>🔋 MONITOR DAYA</h2>
-            <div class="big-value"><span id="valVolt">0.00</span> <span class="unit">Volt</span></div>
-            <div class="battery-shell">
-                <div id="barVolt" class="battery-level"></div>
-            </div>
-            <p style="font-size: 0.75rem; color: #777;">Safe Range: 6.0V - 8.4V</p>
-        </div>
-
-        <div class="card">
-            <h2>🚀 STATUS REAL-TIME</h2>
-            <div style="display: flex; justify-content: space-around; align-items: center;">
-                <div>
-                    <div class="unit">Speed (PWM)</div>
-                    <div id="valSpeed" class="big-value">0</div>
-                </div>
-                <div style="width: 1px; height: 50px; background: #333;"></div>
-                <div>
-                    <div class="unit">Steering (°)</div>
-                    <div id="valAngle" class="big-value">90</div>
-                </div>
+    <div class="grid-container">
+        <div class="card card-full">
+            <div class="card-label">Battery Voltage</div>
+            <div class="card-value"><span id="valVolt">0.00</span> <span class="unit">V</span></div>
+            <div class="battery-container">
+                <div id="barVolt" class="battery-fill"></div>
             </div>
         </div>
 
-        <div class="card" style="grid-column: 1 / -1;">
-            <h2>🎮 KONTROL WEB (ALTERNATIVE)</h2>
-            
-            <label style="color: #aaa; font-size: 0.9rem;">Throttle (Maju/Mundur)</label>
+        <div class="card">
+            <div class="card-label">Speed</div>
+            <div class="card-value" id="valSpeed">0</div>
+            <div class="unit">PWM</div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Steering</div>
+            <div class="card-value" id="valAngle">90</div>
+            <div class="unit">DEGREE</div>
+        </div>
+    </div>
+
+    <div class="card card-full" style="width: 100%; max-width: 600px; box-sizing: border-box;">
+        <div class="card-label" style="margin-bottom: 20px; color: var(--accent-blue);">WEB CONTROLLER</div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <span>Mundur</span>
+                <span id="dispSpeed" style="color: var(--accent-blue);">0</span>
+                <span>Maju</span>
+            </div>
             <input type="range" id="sliderSpeed" min="-255" max="255" value="0" oninput="sendSpeed(this.value)">
-            <p style="margin-top: -10px; font-size: 0.8rem; color: #888;">PWM: <span id="dispSpeed" style="color: #fff;">0</span></p>
+        </div>
 
-            <label style="color: #aaa; font-size: 0.9rem;">Steering (Kiri/Kanan)</label>
+        <div class="control-group">
+            <div class="control-header">
+                <span>Kiri</span>
+                <span id="dispSteer" style="color: var(--accent-blue);">90</span>
+                <span>Kanan</span>
+            </div>
             <input type="range" id="sliderSteer" min="50" max="130" value="90" oninput="sendSteer(this.value)">
-            <p style="margin-top: -10px; font-size: 0.8rem; color: #888;">Angle: <span id="dispSteer" style="color: #fff;">90</span></p>
-
-            <button class="btn-stop" onclick="emergencyStop()">🛑 REM DARURAT (EMERGENCY STOP)</button>
         </div>
     </div>
 
     <script>
-        // --- KONFIGURASI MQTT KHUSUS VERCEL (SECURE) ---
-        // 1. Broker: Tetap HiveMQ
-        // 2. Port: 8884 (Secure WebSocket / WSS) -> WAJIB untuk Vercel
-        // 3. SSL: true -> WAJIB untuk Vercel
+        // --- KONFIGURASI MQTT (VERCEL READY) ---
         const broker = "broker.hivemq.com";
-        const port = 8884; 
-        const clientID = "WebDash_IoTFinpro_" + parseInt(Math.random() * 100000);
+        const port = 8884; // Secure Port
+        const clientID = "WebUser_" + parseInt(Math.random() * 10000);
         
-        // Topik (Sinkron dengan ESP32)
+        // Topik
         const topic_rx_volt  = "ui/iotfinpro/telemetry/voltage";
         const topic_rx_speed = "ui/iotfinpro/telemetry/speed";
         const topic_rx_angle = "ui/iotfinpro/telemetry/steering";
@@ -132,35 +226,32 @@
         const topic_tx_speed = "ui/iotfinpro/control/speed";
         const topic_tx_steer = "ui/iotfinpro/control/steer";
 
-        // Inisialisasi Client Paho
         const client = new Paho.MQTT.Client(broker, port, clientID);
-
-        // Event Handlers
+        
         client.onConnectionLost = onConnectionLost;
         client.onMessageArrived = onMessageArrived;
 
-        // Mulai Koneksi dengan SSL/TLS
-        console.log("Connecting to " + broker + ":" + port);
+        // Connect
+        console.log("Connecting...");
         client.connect({onSuccess:onConnect, useSSL:true});
 
         function onConnect() {
             console.log("Connected!");
-            document.getElementById("connectionStatus").innerHTML = "Status: Connected ✅ (Siap Monitor)";
-            document.getElementById("connectionStatus").className = "status connected";
-
-            // Subscribe Telemetri
+            const badge = document.getElementById("statusBadge");
+            badge.innerText = "● SYSTEM ONLINE";
+            badge.classList.add("connected");
+            
+            // Subscribe
             client.subscribe("ui/iotfinpro/telemetry/#");
         }
 
         function onConnectionLost(responseObject) {
-            if (responseObject.errorCode !== 0) {
-                console.log("Connection Lost: " + responseObject.errorMessage);
-                document.getElementById("connectionStatus").innerHTML = "Status: Disconnected ❌ (Cek Internet)";
-                document.getElementById("connectionStatus").className = "status disconnected";
-            }
+            console.log("Lost: " + responseObject.errorMessage);
+            const badge = document.getElementById("statusBadge");
+            badge.innerText = "● DISCONNECTED";
+            badge.classList.remove("connected");
         }
 
-        // --- MENERIMA DATA DARI MOBIL (RX) ---
         function onMessageArrived(message) {
             const topic = message.destinationName;
             const payload = message.payloadString;
@@ -169,11 +260,16 @@
                 let v = parseFloat(payload);
                 document.getElementById("valVolt").innerText = v.toFixed(2);
                 
-                // Animasi Bar Baterai (Range 6.0V - 8.4V)
+                // Logic Warna Baterai
                 let percent = ((v - 6.0) / (8.4 - 6.0)) * 100;
-                if (percent < 0) percent = 0; 
-                if (percent > 100) percent = 100;
-                document.getElementById("barVolt").style.width = percent + "%";
+                if(percent < 0) percent = 0; if(percent > 100) percent = 100;
+                
+                const bar = document.getElementById("barVolt");
+                bar.style.width = percent + "%";
+                
+                if(v < 6.8) bar.style.background = "#ef4444"; // Merah
+                else if(v < 7.4) bar.style.background = "#facc15"; // Kuning
+                else bar.style.background = "#22c55e"; // Hijau
             }
             else if (topic === topic_rx_speed) {
                 document.getElementById("valSpeed").innerText = payload;
@@ -183,7 +279,7 @@
             }
         }
 
-        // --- MENGIRIM PERINTAH KE MOBIL (TX) ---
+        // Logic Pengirim (Publisher).
         function sendSpeed(val) {
             document.getElementById("dispSpeed").innerText = val;
             let message = new Paho.MQTT.Message(val);
@@ -195,16 +291,6 @@
             document.getElementById("dispSteer").innerText = val;
             let message = new Paho.MQTT.Message(val);
             message.destinationName = topic_tx_steer;
-            client.send(message);
-        }
-
-        function emergencyStop() {
-            // Reset Slider ke 0
-            document.getElementById("sliderSpeed").value = 0;
-            document.getElementById("dispSpeed").innerText = "0";
-            // Kirim Perintah Stop
-            let message = new Paho.MQTT.Message("0");
-            message.destinationName = topic_tx_speed;
             client.send(message);
         }
     </script>
